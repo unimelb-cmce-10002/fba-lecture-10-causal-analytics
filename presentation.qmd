@@ -1,7 +1,9 @@
 ---
-title: "Presentation"
-author: "Lachlan Deer"
-institute: "Somewhere"
+title: "Causal Analytics"
+author: "Foundations of Business Analytics"
+institute: "CMCE-10002, University of Melbourne"
+date: today
+date-format: long
 format: 
   beamer: 
     aspectratio: 32
@@ -9,34 +11,570 @@ format:
     theme: mousteau
 ---
 
-# In the morning
+```{r, echo=FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(dagitty)
+library(ggdag)
+```
 
-## Getting up
+## Learning Goals for this Class
 
-- Turn off alarm
-- Get out of bed
+- Explain the difference between correlation and causation.
+- Describe the counterfactual (potential outcomes) framework.
+- Contrast model-based inference and design-based inference.
+- Analyze the DonorsChoose experiment as an example of design-based causal inference.
+- Recognize challenges in the experimental framework such as compliance and spillovers.
 
-## Breakfast
+## Causal Questions
 
-- Eat eggs
-- Drink coffee
+**Does X cause Y?** 
+Examples of causal questions include:
 
-# In the evening
+* Does smoking cause cancer?
+* Does exercise make people happier?
+* Does my social media advertising increase sales?
+* Does hiring an influencer to promote a product lead to an increased consumer awareness about the product?
 
-## Dinner
+Not all causal questions use the word "*cause*". Other words that imply causality include:
 
-- Eat spaghetti
-- Drink wine
+* Improve
+* Increase / decrease
+* Lead to
+* Make
 
-## Going to sleep
+Tell-tale sign that a question is causal: analysis is used to make an argument for changing a procedure, policy, or practice.
 
-- Get in bed
-- Count sheep
+## The Difficulty of Casual Analytics
 
-# Before I Sleep
+**\alert{Potential Problem}**: Numbers we observe do not tell us whether changes in business outcomes are caused by business strategy decisions
 
-## I write equations
+* In which case we **cannot** answer the causal questions without further work
+* Why?
+    * \alert{Observational data} often \alert{lacks a "what if"} or a "what would have been"
+
+**\alert{Potential Opportunity}**: Can we figure out how to:
+
+ 1. Collect the right numbers, or 
+ 2. Do the right things to those numbers, 
+
+to get an actual answer to our question
+
+$\implies$ \alert{How can we \textbf{design} the right kind of analysis to answer our question}
+
+## Association vs Causation
+
+\begin{figure}
+\centering
+\includegraphics[width=12cm]{figs/nicholas_cage_drowning.png}
+\end{figure}
+
+## The Difficulty of Casual Effects in Observational Data
+
+**Challenge 1**: Omitted Variables (Z): variable that affects both X & Y that is not included in the analysis
+
+```{r, echo = FALSE, cache = TRUE, out.width="60%", fig.align='center'}
+
+dag <- dagify(y ~ x + z,
+  x ~ z,
+  exposure = "x",
+  outcome = "y"
+)
+
+ggdag(dag, 
+      layout = "circle",
+      node_size = 20,
+      text_size = 10) +
+    geom_dag_edges(edge_width = 2, 
+                   #alpha = 0.4,
+                   arrow_directed = grid::arrow(length = grid::unit(14, "pt"), type = "closed"),
+                   arrow_bidirected = grid::arrow(length = grid::unit(14, "pt"), 
+                                                  ends = "both", type ="closed"
+                                                  ),
+    
+                   ) + 
+    theme_dag_blank()
+
+
+```
+
+## Omitted Variable Bias
+
+:::: {.columns}
+
+::: {.column width="50%"}
+\begin{figure}
+\includegraphics[width=6cm]{figs/ovb.png}
+\end{figure}
+:::
+
+::: {.column width="50%"}
+\vspace{2cm}
+
+Does exercise cause weightloss?
+:::
+
+::::
+
+## The Difficulty of Casual Effects in Observational Data
+
+**Challenge 2**: Selection Effects: improper (non random) selection of individuals, such that the sample of cases and controls are not drawn from the same reference population
+
+```{r, cache = TRUE, out.width="60%", fig.align='center'}
+dag <- dagify(y ~ x,
+              y ~~ z,
+  x ~~ z,
+  exposure = "x",
+  outcome = "y"
+)
+
+ggdag(dag, 
+      layout = "circle",
+      node_size = 20,
+      text_size = 10) +
+    geom_dag_edges(edge_width = 2, 
+                   #alpha = 0.4,
+                   arrow_directed = grid::arrow(length = grid::unit(14, "pt"), type = "closed"),
+                   arrow_bidirected = grid::arrow(length = grid::unit(14, "pt"), 
+                                                  ends = "both", type ="closed"
+                                                  ),
+    
+                   ) + 
+    theme_dag_blank()
+
+```
+
+## Selection Effects
+
+:::: {.columns}
+
+::: {.column width="50%"}
+\begin{figure}
+\includegraphics[width=6cm]{figs/selection.png}
+\end{figure}
+:::
+
+::: {.column width="50%"}
+\vspace{1cm}
+
+Should we use to plan where to put additional armor on fighter jets based on the damage of planes that return to base? 
+:::
+
+::::
+
+
+## Solutions to OVB and Selection Effects
+
+Omitted Variable Bias and Selection Effects mean **our estimates** of the effect of X on Y **are biased**
+
+Possible Solutions:
+
+1. Model Based Inference
+2. Design Based Inference
+
+# Business Challenge: Encouraging Donors to Share About Charity
+
+##
+
+\begin{figure}
+\includegraphics[width=12cm]{figs/pymwymi.png}
+\end{figure}
+
+\footnotesize
+
+Discussion based on: Silver & Small. (2023). [Put Your Mouth Where Your Money Is: A Field Experiment Encouraging Donors to Share About Charity](https://doi.org/10.1287/mksc.2023.1450)
+
+## Intervention Context
+
+* \textbf{\alert{Research Question}}: Can we effectively get donors to share about charitable donations?
+
+* \textbf{\alert{Why is this relevant?}}
+    * Raises awareness and bolsters fundraising efforts for good causes
+
+* This isn't easy: Donors face a trade off
+    - -ve: (Personal) Reputation risks via appearing braggy or inauthentic, vs.
+    - +ve: (External) Word of Mouth benefits to the charity
+
+* Today we'll explore this question in the context of charitable giving for educational projects, and an intervention that encourages sharing about the charity after donation
+    * $Y_i =$ clicking on a sharing pop-up OR recruiting future donors (0/1)
+    * $T_i =$ an intervention encouraging sharing about cause post-donation (0/1)
+
+## Study Design: Setting
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+\vspace{1.5cm}
+
+**When**: Four-week period from August 13, 2020, to September 9, 2020
+
+\vspace{0.5cm}
+
+**Where**: DonorsChoose.org
+:::
+
+::: {.column width="50%"}
+\centering
+\includegraphics[width=6cm]{figs/BR-Donorschoose.jpg}
+
+:::
+
+::::
+
+## Study Design: Treatments
+
+**Control Condition**: 
+
+> "Share this classroom with family and friends"
+
+**Treatment Condition**:
+
+> "Your donation can start a chain reaction, but only if you tell others about the cause. Share this classroom with family and friends"
+
+
+## Study Design: Sharing Contributions
+
+:::: {.columns}
+
+::: {.column width="33%"}
+\centering
+\includegraphics[width=4cm]{figs/facebook.png}
+:::
+
+::: {.column width="33%"}
+\centering
+\includegraphics[width=4cm]{figs/twitter.png}
+:::
+
+::: {.column width="33%"}
+\centering
+\includegraphics[width=4cm]{figs/gmail.png}
+:::
+
+::::
+
+## Causal Questions 
+
+\alert{Does} cause based solicitation *increase* sharing? 
+
+\alert{Does} cause based solicitation recruit *more* future donors?
+
+$\rightarrow$ Comparison between factual and counterfactual
+
+**Fundamental problem of causal inference**: Analyst must infer counterfactual outcomes
+
+## Causal Effects and Counterfactuals 
+
+* What does "$T_i$ causes $Y_i$ mean? $\rightsquigarrow$ **counterfactuals**, "*what if*"
+    * Would donor $i$ who saw the standard solicitation have clicked through if they saw the one that emphasized the cause
+* Two **potential outcomes**:
+    * $Y_i(1)$: would donor click through if they saw cause based solicitation?
+    * $Y_i(0)$:  would donor click through if they saw standard solicitation??
+* **Causal effect**: $Y_i(1) - Y_i(0)$
+
+* **Fundamental problem of causal inference**: only one of the two potential outcomes is observable per observation.
+
+## Potential Outcomes 
+
+\begin{table}[]
+\begin{tabular}{l|cccc}
+                                   & $T_i$ & $Y_i$ (click-through) & $Y_i(0)$ & $Y_i(1)$ \\
+                                   \hline
+Donor saw standard solicitation    & 0     & 0                     & 0        & ???      \\
+Donor saw solicitation for a cause & 1     & 1                     & ???      & 1       \\
+\hline
+\end{tabular}
+\end{table}
+
+\vspace{0.5cm}
+
+* **Association is not causation**
+* How can we infer the missing counterfactuals?
+
+## How to Figure Out Counterfactuals 
+
+* **Need to find \alert{similar} observations**!
+
+* Sounds easy ... but
+    * Harder than it sounds, and 
+    * Requires assumptions
+
+# Potential Approaches
+
+## Before–After in Time
+
+* Imagine that DonorsChoose first used the *standard* message (“Share this classroom”) and then switched to the *cause-based* message (“Your donation can start a chain reaction…”).
+
+* We could compare **sharing rates before and after** the change:
+
+| Period | Message Type | Share Rate |
+|:-------|:--------------|-----------:|
+| Weeks 1–2 | Standard | 14% |
+| Weeks 3–4 | Cause-based | 15% |
+
+* At first glance, it looks like the cause-based message *increased* sharing by 1 percentage point.  
+
+> But does that mean the message **caused** the change?
+
+## The Problem with Simple Before–After Comparisons
+
+Many other things can change over time:  
+
+- Teachers might post more compelling projects.
+- Start of the school year
+- Donor enthusiasm could naturally rise toward the end of a campaign.  
+- News or social media events could affect traffic to the site.
+
+So the observed difference measures:
 
 $$
-y = x \beta + \varepsilon
+\text{Observed Change} = \text{True Effect of Message} + \text{Other Time-Related Changes.}
 $$
+
+We can't tell how much of the change is truly due to the new message versus outside trends.
+
+## Other Ways To Make Groups Comparable?
+
+* One option is to use what we already know — or think we know — about how the world works to adjust our comparisons.
+
+
+* We call this **model-based inference**.
+
+
+* If our assumptions are right, our comparison becomes meaningful.  
+* If they’re wrong, the model can mislead us just as easily as the data.
+
+## A Simulated World
+
+* Imagine a simple artificial economy where people earn income according to these rules:
+
+1. Income is log-normally distributed.  
+2. Being **brown-haired** gives a **10% income boost**.  
+3. 20% of people are naturally brown-haired.  
+4. Having a **college degree** gives a **20% income boost**.  
+5. 30% of people have college degrees.  
+6. 40% of people without brown hair or college degrees **dye** their hair brown.
+
+## Hair Color and Income Simulation
+
+```{r}
+#| echo: false
+#| fig-height: 3
+#| fig-width: 5
+#| fig-align: center
+
+library(tidyverse)
+
+sim <- read_csv("data/brown_hair_example.csv")
+
+sim %>%
+  ggplot(aes(x = log_income, fill = hair)) +
+  geom_density(alpha = 0.4) +
+  ggokabeito::scale_fill_okabe_ito() + 
+  labs(
+    x = "Income",
+    y = "Density",
+    fill = "Hair color",
+    title = "Income distributions by hair color"
+  ) +
+  theme_minimal()
+```
+
+**Almost complete overlap** between brown and non-brown haired earners.
+
+## Comparing Mean Incomes
+
+```{r}
+sim |> 
+  group_by(hair) |> 
+  summarise(mean_income = mean(log_income)) |> 
+  mutate(pct_diff = round(mean_income - lag(mean_income), 2))
+```
+
+
+Only a **2% difference**!  
+But the true effect is **10%**. Why?
+
+## Omitted Variable Bias Redux
+
+So the brown-haired group contains more **non-graduates**, pulling down its average income.
+
+* This is **omitted variable bias** 
+    * Hidden factor (education) correlated with hair color and income.
+
+* People without degrees are more likely to dye their hair brown, pulling down the average income of the brown-haired group.
+
+## Correcting the Comparison
+
+What if we focus only on **college graduates**?
+
+Among graduates:
+
+- Nobody dyes their hair.  
+- Hair color is unrelated to education.
+
+```{r}
+sim |> 
+  filter(college == TRUE) |> 
+  group_by(hair) |> 
+  summarise(mean_income = mean(log_income)) |> 
+  mutate(pct_diff = round(mean_income - lag(mean_income), 3))
+```
+
+Now we see a **12.2% difference**, close to the true 10%.
+
+## What Just Happened?
+
+* We used our **model of the world**  to decide how to make a fair comparison.
+
+* By holding education constant, we **controlled for confounding** and recovered the true causal relationship.
+
+::: callout-tip
+This is the essence of **model-based inference**:
+We rely on a model — a set of assumptions about how outcomes are generated — to approximate the right counterfactuals.
+:::
+
+In real business data:
+
+- We rarely know the true data-generating process.  
+- We must rely on **domain knowledge** or **theory** to choose variables.  
+- If our model is wrong, our inference will be too.
+
+## Where Do Assumptions Come From?
+
+In our simulated economy, we *knew* the rules.
+
+In the real world:
+
+- Analysts rely on **theory**, **prior evidence**, or **expertise**.  
+- Our conclusions are only as good as our model.  
+- That’s why model-based inference always carries **risk**.
+
+## Design Based Inference
+
+* **Design-based inference:** create fair comparisons through **how we collect data**.  
+* Randomization is the simplest and most powerful way to do that.
+
+* When we randomly assign individuals to receive an intervention —   each person has the same chance of ending up in either group.
+
+* Because this process is random, any pre-existing differences are **spread out evenly** across both groups.
+
+## Visualizing Random Assignment
+
+![Randomization diagram — one pool splitting into treatment and control](figs/random_allocation.png){width=80%}
+
+
+When we compare the average outcomes of these two groups any difference can be attributed to the treatment itself.
+
+## The DonorsChoose Field Experiment
+
+* Researchers designed a **field experiment** embedded in the DonorsChoose platform.
+    * Randomly allocating Donors into one of two conditions:
+
+| Group | Message Type | Example Text |
+|----|-----|-----|
+| Control | Standard message | “Please share this classroom with others.” |
+| Treatment | Social-impact message | “Your donation can start a chain reaction — but only if you tell others.” |
+
+* Because message type was assigned **at random**
+* Both groups are similar *on average* in every other respect.  
+* That makes any difference in sharing behavior a **credible causal estimate**.
+
+## Results: Clickthrough and Recruitment
+
+```{r}
+#| echo: false
+donors_choose <-
+    read_csv("data/donors_choose.csv")
+
+donors_choose |>  
+  group_by(condition) |> 
+  summarize(click = round(mean(clickthrough), 3),
+            recruit = round(mean(recruited), 3))
+```
+
+
+Among control donors, **14.4%** clicked to share.  
+Among treated donors, **15.1%** did — a **0.7-percentage-point increase**.  
+
+This difference is **causal**.
+
+## Is This a Big Effect?
+
+In absolute terms, sharing rose by **0.7 pp** (14.4 → 15.1%).  
+
+That’s a **4.9% relative increase** in sharing:
+
+$$
+\frac{0.151 - 0.144}{0.144} \approx 0.049
+$$
+
+* It’s small in magnitude   but typical in large-scale marketing experiments  
+* Even tiny percentage gains can translate into **hundreds of additional shares**.
+
+## Two Assumptions in Experiments
+
+::: columns
+::: column
+### Comparability  
+*(from Random Assignment)*
+
+- Everyone has the **same chance** of receiving the treatment.  
+- Groups differ **only** by the treatment, not other factors.  
+- Participants actually receive the condition assigned (**compliance**).  
+:::
+
+::: column
+###  Stability  
+*(Stable Unit Treatment Value Assumption — SUTVA)*
+
+- Each donor’s outcome depends only on **their own** treatment (**no spillovers**).  
+- Everyone assigned can produce an outcome (**no attrition**).  
+- The treatment means the **same thing** for everyone (**consistency**).  
+
+:::
+:::
+
+Design-based inference doesn’t remove assumptions —   it replaces many **hard-to-test modeling assumptions**   with a **smaller, transparent set** tied directly to research design.
+
+## When Assumptions Break
+
+::: columns
+::: column
+###  Threats to Comparability
+
+- **Biased randomization**  
+  A bug assigns more active donors to one message → groups not comparable.  
+
+- **Non-compliance**  
+  Some “treated” donors never see the message → effect diluted.  
+:::
+
+::: column
+### Threats to Stability
+
+- **Spillovers**  
+  Treated donors post publicly and control donors see it → violates SUTVA.  
+
+- **Inconsistent treatment**  
+  Message wording varies slightly across browsers → causal effect hard to interpret.  
+:::
+:::
+
+## Summary: From Correlation to Causation
+
+**Causal Analytics = Thinking about the right counterfactual.**  
+
+* We move from *“what happened?”* → *“what would have happened otherwise?”*  
+* Model-based and design-based inference are two paths to reach that counterfactual.
+
+* Model-Based Inference: Use **theory and assumptions** to adjust for differences in observational data.  
+    * If the model is right → inference is credible.  
+
+* Design-Based Inference: Use **randomization** to create comparability by design.  
+    * Groups differ only by the treatment.  
+    * Arguably weaker assumptions:  
+        1.  **Comparability** (random assignment works)  
+        2. **Stability** (no spillovers, consistent treatment)
